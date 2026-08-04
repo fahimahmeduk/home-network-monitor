@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+BASE="/opt/home-network-monitor"
+
+case "${1:-help}" in
+
+status)
+echo "Home Network Monitor"
+echo "--------------------"
+echo "Internet state: $(cat "$BASE/state/internet.state" 2>/dev/null || echo Unknown)"
+echo "Last internet check:"
+tail -1 "$BASE/logs/internet.log" 2>/dev/null
+echo
+echo "Last speed test:"
+tail -1 "$BASE/logs/speed.csv" 2>/dev/null
+;;
+
+check)
+"$BASE/internet-monitor.sh"
+;;
+
+speed)
+"$BASE/speed-monitor.sh"
+;;
+
+logs)
+tail -20 "$BASE/logs/internet.log"
+echo
+tail -20 "$BASE/logs/speed.csv"
+;;
+
+test-telegram)
+source "$BASE/config.conf"
+curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+-d "chat_id=${CHAT_ID}" \
+--data-urlencode "text=✅ Home Network Monitor test successful"
+;;
+
+*)
+echo "Usage:"
+echo
+echo "network-monitor status"
+echo "network-monitor check"
+echo "network-monitor speed"
+echo "network-monitor logs"
+echo "network-monitor test-telegram"
+;;
+
+esac
