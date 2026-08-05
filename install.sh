@@ -35,6 +35,10 @@ sudo install -m 0755 \
     "$INSTALL_DIR/speed-monitor.sh"
 
 sudo install -m 0755 \
+    "$PROJECT_DIR/scripts/daily-summary.sh" \
+    "$INSTALL_DIR/daily-summary.sh"
+
+sudo install -m 0755 \
     "$PROJECT_DIR/scripts/network-monitor" \
     "$CLI_PATH"
 
@@ -62,6 +66,7 @@ CURRENT_CRON="$(crontab -l 2>/dev/null || true)"
 
     echo "*/5 * * * * $INSTALL_DIR/internet-monitor.sh >/dev/null 2>&1 # $CRON_MARKER"
     echo "0 8,20 * * * $INSTALL_DIR/speed-monitor.sh >/dev/null 2>&1 # $CRON_MARKER"
+    echo "5 20 * * * $INSTALL_DIR/daily-summary.sh >/dev/null 2>&1 # $CRON_MARKER"
 } | crontab -
 
 echo
@@ -69,6 +74,7 @@ echo "Installation complete."
 echo
 echo "Connectivity checks: every 5 minutes"
 echo "Speed tests: 08:00 and 20:00"
+echo "Daily summary: 20:05"
 echo
 echo "Next steps:"
 echo "1. Review $CONFIG_FILE"

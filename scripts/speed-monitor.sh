@@ -27,6 +27,7 @@ send_telegram() {
 }
 
 NOW="$(date '+%Y-%m-%d %H:%M:%S')"
+DISPLAY_TIME="$(date '+%H:%M')"
 PREVIOUS_STATE="$(cat "$STATE_FILE" 2>/dev/null || echo unknown)"
 FAIL_COUNT="$(cat "$FAIL_COUNT_FILE" 2>/dev/null || echo 0)"
 
@@ -37,11 +38,11 @@ RESULT="$(
 )"
 
 if [[ -z "$RESULT" ]]; then
-    send_telegram "⚠️ Home network speed test failed
+    send_telegram "⚠️ Home Network Speed Test Failed
 
 No result was returned.
 
-Time: $NOW"
+🕒 ${DISPLAY_TIME}"
     exit 1
 fi
 
@@ -50,11 +51,11 @@ LATENCY_NS="$(jq -r '.servers[0].latency // -1' <<< "$RESULT")"
 SERVER="$(jq -r '.servers[0].sponsor // "Unknown server"' <<< "$RESULT")"
 
 if [[ "$DOWNLOAD_BYTES" == "-1" || "$LATENCY_NS" == "-1" ]]; then
-    send_telegram "⚠️ Home network speed test failed
+    send_telegram "⚠️ Home Network Speed Test Failed
 
 The result could not be parsed.
 
-Time: $NOW"
+🕒 ${DISPLAY_TIME}"
     exit 1
 fi
 
@@ -65,6 +66,16 @@ DOWNLOAD_MBPS="$(
 LATENCY_MS="$(
     awk "BEGIN { printf \"%.2f\", $LATENCY_NS / 1000000 }"
 )"
+
+DOWNLOAD_DISPLAY="$(
+    awk "BEGIN { printf \"%.0f\", $DOWNLOAD_MBPS }"
+)"
+
+LATENCY_DISPLAY="$(
+    awk "BEGIN { printf \"%.0f\", $LATENCY_MS }"
+)"
+
+SERVER_DISPLAY="${SERVER% Limited}"
 
 mkdir -p "$BASE/logs" "$BASE/state"
 
@@ -95,39 +106,41 @@ if [[ "$STATUS" == "degraded" ]]; then
     if [[ "$FAIL_COUNT" -ge "$CONSECUTIVE_FAILURES_REQUIRED" && "$PREVIOUS_STATE" != "degraded" ]]; then
         echo "degraded" > "$STATE_FILE"
 
-        send_telegram "⚠️ Home network performance degraded
+        send_telegram "📊 Home Network Status
 
-Download: ${DOWNLOAD_MBPS} Mbps
-Latency: ${LATENCY_MS} ms
-Server: ${SERVER}
+🟠 Performance Degraded
 
-Download threshold: ${DOWNLOAD_THRESHOLD_MBPS} Mbps
-Latency threshold: ${LATENCY_THRESHOLD_MS} ms
+⬇️ Download: ${DOWNLOAD_DISPLAY} Mbps
+📶 Latency: ${LATENCY_DISPLAY} ms
+🌐 Server: ${SERVER_DISPLAY}
 
-Consecutive poor tests: ${FAIL_COUNT}
-Time: ${NOW}"
+⚠️ Poor tests: ${FAIL_COUNT}
+🕒 ${DISPLAY_TIME}"
     fi
 else
     echo "0" > "$FAIL_COUNT_FILE"
     echo "healthy" > "$STATE_FILE"
 
     if [[ "$PREVIOUS_STATE" == "degraded" && "$RECOVERY_NOTIFICATIONS" == "true" ]]; then
-        send_telegram "✅ Home network performance restored
+        send_telegram "📊 Home Network Status
 
-Download: ${DOWNLOAD_MBPS} Mbps
-Latency: ${LATENCY_MS} ms
-Server: ${SERVER}
+🟢 Restored
 
-Time: ${NOW}"
+⬇️ Download: ${DOWNLOAD_DISPLAY} Mbps
+📶 Latency: ${LATENCY_DISPLAY} ms
+🌐 Server: ${SERVER_DISPLAY}
+
+🕒 ${DISPLAY_TIME}"
 
     elif [[ "$NOTIFY_ON_SUCCESS" == "true" ]]; then
-        send_telegram "📊 Scheduled home network speed test
+        send_telegram "📊 Home Network Status
 
-Status: Healthy
-Download: ${DOWNLOAD_MBPS} Mbps
-Latency: ${LATENCY_MS} ms
-Server: ${SERVER}
+🟢 Healthy
 
-Time: ${NOW}"
+⬇️ Download: ${DOWNLOAD_DISPLAY} Mbps
+📶 Latency: ${LATENCY_DISPLAY} ms
+🌐 Server: ${SERVER_DISPLAY}
+
+🕒 ${DISPLAY_TIME}"
     fi
 fi
