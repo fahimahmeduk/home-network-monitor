@@ -16,7 +16,7 @@ printf '%s\n' "$CURRENT_CRON" |
 
 sudo rm -f "$CLI_PATH"
 
-read -r -p "Keep configuration and logs? [Y/n]: " answer
+read -r -p "Keep configuration, logs and state files? [Y/n]: " answer
 answer="${answer:-Y}"
 
 if [[ "$answer" =~ ^[Nn]$ ]]; then
@@ -25,7 +25,8 @@ if [[ "$answer" =~ ^[Nn]$ ]]; then
 else
     sudo rm -f \
         "$INSTALL_DIR/internet-monitor.sh" \
-        "$INSTALL_DIR/speed-monitor.sh"
+        "$INSTALL_DIR/speed-monitor.sh" \
+        "$INSTALL_DIR/daily-summary.sh"
 
     echo "Configuration, logs and state preserved in:"
     echo "$INSTALL_DIR"
