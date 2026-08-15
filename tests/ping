@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+set -u
+
+quiet=false
+for argument in "$@"; do
+    if [[ "$argument" == "-q" ]]; then
+        quiet=true
+        break
+    fi
+done
+
+if [[ "$quiet" == "true" ]]; then
+    loss="${FAKE_PACKET_LOSS_PERCENT:-0}"
+    received=$((20 - ((20 * loss) / 100)))
+    printf '%s\n' "20 packets transmitted, ${received} received, ${loss}% packet loss, time 3800ms"
+
+    if [[ "$loss" -ge 100 ]]; then
+        exit 1
+    fi
+    exit 0
+fi
+
+if [[ "${FAKE_CONNECTIVITY_DOWN:-false}" == "true" ]]; then
+    exit 1
+fi
+
+exit 0

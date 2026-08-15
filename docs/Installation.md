@@ -1,209 +1,114 @@
-# Installation Guide
+# Installation
 
-This guide walks through installing **Home Network Monitor** on Ubuntu.
+## Supported environment
 
----
+Home Network Monitor is designed for a Linux server running Bash and cron. Ubuntu Server is the primary tested platform.
 
-# Supported Operating Systems
+## Prerequisites
 
-The project has been tested on:
-
-- Ubuntu Server 24.04 LTS
-
-Other Debian-based distributions may also work but are currently untested.
-
----
-
-# Requirements
-
-Before installing, ensure the following packages are available:
-
-- Bash
-- curl
-- jq
-- cron
-- ping
-- awk
-- timeout (coreutils)
-
-Verify the required commands:
+Confirm these commands are available:
 
 ```bash
-command -v curl jq awk ping timeout
+command -v curl
+command -v jq
+command -v ping
+command -v timeout
+command -v crontab
+command -v flock
+command -v speedtest-go
 ```
 
----
+Install [`speedtest-go`](https://github.com/showwin/speedtest-go) from its official release instructions and ensure the binary is executable.
 
-# Install speedtest-go
-
-This project uses **speedtest-go** for scheduled internet speed tests.
-
-Download the latest release:
+## Install from GitHub
 
 ```bash
-DOWNLOAD_URL=$(curl -s https://api.github.com/repos/showwin/speedtest-go/releases/latest \
-| grep browser_download_url \
-| grep Linux_x86_64 \
-| cut -d '"' -f4)
-```
-
-Download:
-
-```bash
-cd /tmp
-curl -L "$DOWNLOAD_URL" -o speedtest-go.tar.gz
-```
-
-Extract:
-
-```bash
-tar -xzf speedtest-go.tar.gz
-```
-
-Install:
-
-```bash
-sudo install -m 0755 speedtest-go /usr/local/bin/speedtest-go
-```
-
-Verify:
-
-```bash
-speedtest-go --version
-```
-
----
-
-# Clone the Repository
-
-```bash
-git clone git@github.com:fahimahmeduk/home-network-monitor.git
-
+git clone https://github.com/fahimahmeduk/home-network-monitor.git
 cd home-network-monitor
-```
-
----
-
-# Install
-
-Run:
-
-```bash
 ./install.sh
 ```
 
-The installer will:
+The installer:
 
-- Create the installation directory
-- Install all scripts
-- Install the CLI
-- Create the configuration file (if required)
-- Configure scheduled cron jobs
+- Checks dependencies
+- Installs scripts under `/opt/home-network-monitor`
+- Installs the CLI under `/usr/local/bin/network-monitor`
+- Creates a private configuration file
+- Creates writable log and state directories
+- Adds idempotent cron entries for the current user
+- Preserves configuration during upgrades
 
----
-
-# Configure Telegram
-
-Edit:
+## Configure Telegram and thresholds
 
 ```bash
 sudo nano /opt/home-network-monitor/config.conf
 ```
 
-Update:
-
-```text
-BOT_TOKEN=
-CHAT_ID=
-```
-
----
-
-# Verify Installation
-
-Check the CLI:
+At minimum, replace:
 
 ```bash
-network-monitor status
+BOT_TOKEN="YOUR_TELEGRAM_BOT_TOKEN"
+CHAT_ID="YOUR_TELEGRAM_CHAT_ID"
 ```
 
-Run a Telegram test:
+Review the speed thresholds and server IDs. See [Configuration](Configuration.md).
+
+## Validate
 
 ```bash
 network-monitor test-telegram
-```
-
-Run a manual connectivity check:
-
-```bash
 network-monitor check
+network-monitor status
 ```
 
-Run a manual speed test:
+Run one manual speed test:
 
 ```bash
-network-monitor speed
+time network-monitor speed
+network-monitor status
 ```
 
----
+A speed test can use 1–2 GB. If confirmation is required, two tests may run.
 
-# Verify Scheduled Tasks
-
-View the installed cron jobs:
+Send a daily summary manually:
 
 ```bash
-crontab -l
+network-monitor summary
 ```
 
-Expected output:
+## Verify cron
+
+```bash
+crontab -l | grep HOME-NETWORK-MONITOR
+```
+
+Expected entries:
 
 ```text
-*/5 * * * * /opt/home-network-monitor/internet-monitor.sh >/dev/null 2>&1
-
-0 8,20 * * * /opt/home-network-monitor/speed-monitor.sh >/dev/null 2>&1
-
-5 20 * * * /opt/home-network-monitor/daily-summary.sh >/dev/null 2>&1
+*/5 * * * * /opt/home-network-monitor/internet-monitor.sh >/dev/null 2>&1 # HOME-NETWORK-MONITOR
+0 8,20 * * * /opt/home-network-monitor/speed-monitor.sh >/dev/null 2>&1 # HOME-NETWORK-MONITOR
+10 20 * * * /opt/home-network-monitor/daily-summary.sh >/dev/null 2>&1 # HOME-NETWORK-MONITOR
 ```
 
----
+## Upgrade
 
-# Updating
-
-Pull the latest changes:
+From the repository:
 
 ```bash
-git pull
-```
-
-Reinstall:
-
-```bash
+git pull --ff-only
 ./install.sh
 ```
 
----
+The installer preserves the live `config.conf` and adds missing settings. The first speed test after a CSV schema change archives the previous log.
 
-# Uninstall
+Always review release notes before upgrading.
 
-Run:
+## Uninstall
+
+From the repository:
 
 ```bash
 ./uninstall.sh
 ```
 
-The uninstaller allows you to:
-
-- Remove scripts only
-- Preserve configuration
-- Preserve logs
-- Preserve historical monitoring data
-
----
-
-# Troubleshooting
-
-If installation fails, see:
-
-```
-docs/Troubleshooting.md
-```
+Review the uninstaller output carefully, particularly if runtime logs or configuration should be retained.

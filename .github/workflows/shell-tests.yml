@@ -1,0 +1,36 @@
+name: Shell tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install test dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes jq
+
+      - name: Validate Bash syntax
+        run: |
+          bash -n install.sh
+          bash -n uninstall.sh
+          bash -n scripts/internet-monitor.sh
+          bash -n scripts/speed-monitor.sh
+          bash -n scripts/daily-summary.sh
+          bash -n scripts/network-monitor
+          bash -n tests/run-tests.sh
+
+      - name: Run simulated tests
+        run: |
+          chmod +x tests/run-tests.sh tests/fake-speedtest-go tests/curl tests/ping
+          tests/run-tests.sh
