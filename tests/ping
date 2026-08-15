@@ -26,4 +26,3 @@ if [[ "${FAKE_CONNECTIVITY_DOWN:-false}" == "true" ]]; then
 fi
 
 exit 0
-
