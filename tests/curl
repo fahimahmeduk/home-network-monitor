@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+if [[ "$*" == *"${FAKE_ISP_LOOKUP_URL:-https://ipinfo.io/org}"* ]]; then
+    if [[ "${FAKE_ISP_LOOKUP_FAIL:-false}" == "true" ]]; then
+        exit 22
+    fi
+
+    printf '%s\n' "${FAKE_ISP_LOOKUP_RESULT:-AS64500 Independent Test ISP}"
+    exit 0
+fi
+
+printf '%s\n' "$*" >> "$FAKE_CURL_LOG"

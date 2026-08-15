@@ -1,298 +1,141 @@
 # Troubleshooting
 
-This guide covers common issues that may occur when installing or running Home Network Monitor.
-
----
-
-# Telegram messages are not being delivered
-
-## Symptoms
-
-- No Telegram notifications
-- `network-monitor test-telegram` produces no message
-
-## Checks
-
-Verify your configuration:
+## Start with status
 
 ```bash
-cat /opt/home-network-monitor/config.conf
+network-monitor version
+network-monitor status
+network-monitor logs
 ```
 
-Ensure:
+## Configuration is unreadable
 
-```text
-BOT_TOKEN="..."
-CHAT_ID="..."
-```
-
-Verify your bot token:
-
-```bash
-curl https://api.telegram.org/botYOUR_TOKEN/getMe
-```
-
-Expected:
-
-```json
-"ok": true
-```
-
-If the response is:
-
-```text
-404 Not Found
-```
-
-your Bot Token is incorrect.
-
----
-
-# Test Telegram manually
-
-Run:
-
-```bash
-network-monitor test-telegram
-```
-
-If no message is received, confirm:
-
-- Bot Token
-- Chat ID
-- Internet connectivity
-
----
-
-# speedtest-go not found
-
-## Symptoms
-
-```text
-speedtest-go: command not found
-```
-
-Verify:
-
-```bash
-which speedtest-go
-```
-
-Expected:
-
-```text
-/usr/local/bin/speedtest-go
-```
-
-If it is missing, reinstall it following:
-
-```
-docs/Installation.md
-```
-
----
-
-# jq missing
-
-## Symptoms
-
-```text
-jq: command not found
-```
-
-Install:
-
-```bash
-sudo apt update
-sudo apt install jq
-```
-
-Verify:
-
-```bash
-jq --version
-```
-
----
-
-# Cron jobs are missing
-
-View cron jobs:
-
-```bash
-crontab -l
-```
-
-Expected:
-
-```text
-*/5 * * * * internet-monitor.sh
-
-0 8,20 * * * speed-monitor.sh
-
-5 20 * * * daily-summary.sh
-```
-
-If they are missing, run:
-
-```bash
-./install.sh
-```
-
----
-
-# Scripts fail syntax check
-
-Check a script:
-
-```bash
-bash -n scripts/speed-monitor.sh
-```
-
-No output means the syntax is valid.
-
----
-
-# Configuration file missing
-
-Check:
+Check ownership and permissions without displaying its contents:
 
 ```bash
 ls -l /opt/home-network-monitor/config.conf
 ```
 
-If missing:
+Run the installer again from the repository. It restores ownership to the installing user and mode `0600` while preserving values.
 
-Run:
-
-```bash
-./install.sh
-```
-
-The installer creates a configuration file automatically if one does not already exist.
-
----
-
-# Permission denied
-
-If a script cannot execute:
+## Telegram test fails
 
 ```bash
-chmod +x script-name.sh
+network-monitor test-telegram
 ```
 
-Example:
+Check:
+
+- The bot token is correct
+- The chat ID is correct
+- The bot has received an initial message
+- Outbound HTTPS to `api.telegram.org` is available
+
+Never paste the live token into an issue or support conversation.
+
+## Connectivity shows DOWN while browsing works
+
+One or more public hosts may ignore ICMP.
+
+Test each configured target:
 
 ```bash
-chmod +x scripts/speed-monitor.sh
+ping -c 5 8.8.8.8
+ping -c 5 1.1.1.1
 ```
 
----
+Set `CONNECTIVITY_TARGETS` to at least two targets that respond reliably from the monitoring server.
 
-# Daily Summary not received
+## Packet loss shows N/A
 
-Run manually:
+Test the configured host:
 
 ```bash
-/opt/home-network-monitor/daily-summary.sh
+ping -c 20 -i 0.2 -W 1 8.8.8.8
 ```
 
-If it works manually but not automatically:
+If it does not respond, change `PACKET_LOSS_HOST`. Do not treat a host that blocks ICMP as genuine 100% packet loss.
 
-Check cron:
+## Primary result is poor but fallback is healthy
+
+This is expected confirmation behaviour. `network-monitor status` records the initial assessment, final server and attempt count.
+
+Review the primary server if this happens consistently. A test server can have poor upload capacity even when the broadband connection is healthy.
+
+## ISP name is incorrect
+
+Compare the host's actual public network with the stored speed result:
 
 ```bash
-crontab -l
-```
-
----
-
-# Speed tests always fail
-
-Verify manually:
-
-```bash
-speedtest-go
-```
-
-If this fails:
-
-- Check internet connectivity
-- Verify the configured server ID
-- Try another server:
-
-```bash
-speedtest-go --list
-```
-
-Update:
-
-```text
-SPEEDTEST_SERVER_ID=
-```
-
-inside:
-
-```text
-/opt/home-network-monitor/config.conf
-```
-
----
-
-# Verify Installation
-
-Run:
-
-```bash
+curl -4 -fsS https://ipinfo.io/org
 network-monitor status
 ```
 
-Expected output:
+The monitor uses the independent lookup first because Speedtest metadata can occasionally identify the caller incorrectly. It falls back to Speedtest metadata if the lookup is unavailable.
 
-- Internet state
-- Last connectivity check
-- Last speed test
+If the independent lookup is also wrong, set an explicit provider name in the private configuration:
 
----
+```bash
+ISP_NAME_OVERRIDE="Your ISP name"
+```
 
-# Collect Useful Information
+Do not publish the public IP address while troubleshooting.
 
-Before reporting an issue, collect:
+## Status reports a previous log format
 
-Current status:
+Run one v1.3 speed test:
+
+```bash
+network-monitor speed
+```
+
+The old CSV is archived safely and a new schema is created.
+
+## Speed test takes several minutes
+
+A poor or failed primary result triggers:
+
+1. A configured wait, normally 60 seconds
+2. A second full test through the fallback server
+3. A final threshold assessment
+
+This is normal and reduces false alerts.
+
+## Scheduled checks are missing
+
+```bash
+crontab -l | grep HOME-NETWORK-MONITOR
+```
+
+Run `./install.sh` again to recreate the entries idempotently.
+
+## No speed data in the daily summary
+
+Confirm that a speed test has completed today:
+
+```bash
+tail -n 5 /opt/home-network-monitor/logs/speed.csv
+```
+
+Then run:
+
+```bash
+network-monitor summary
+```
+
+## Inspect without exposing secrets
+
+Safe commands:
 
 ```bash
 network-monitor status
+network-monitor logs
+crontab -l | grep HOME-NETWORK-MONITOR
 ```
 
-Cron jobs:
+Do not publish:
 
-```bash
-crontab -l
-```
-
-Configuration:
-
-```bash
-cat /opt/home-network-monitor/config.conf
-```
-
-**Remove your Bot Token before sharing.**
-
-Version:
-
-```bash
-git log --oneline -5
-```
-
----
-
-# Still Having Problems?
-
-1. Verify the installation guide.
-2. Review the configuration.
-3. Run the scripts manually.
-4. Check the logs.
-5. Confirm all required dependencies are installed.
-
-Most issues can be resolved by following these steps.
+- `/opt/home-network-monitor/config.conf`
+- Telegram API responses containing account information
+- Public IP addresses
+- Bot tokens or chat IDs

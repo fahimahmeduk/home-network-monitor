@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+set -u
+
+count=0
+if [[ -f "$FAKE_COUNT_FILE" ]]; then
+    count="$(<"$FAKE_COUNT_FILE")"
+fi
+count=$((count + 1))
+printf '%s\n' "$count" > "$FAKE_COUNT_FILE"
+
+mode="${FAKE_MODE:-healthy}"
+if [[ "$mode" == "degraded_then_healthy" && "$count" -gt 1 ]]; then
+    mode="healthy"
+fi
+
+case "$mode" in
+healthy)
+    printf '%s\n' '{"timestamp":"2026-08-15T12:00:00Z","user_info":{"IP":"192.0.2.1","Isp":"Test ISP","Country":"GB"},"servers":[{"dl_speed":112500000,"ul_speed":105000000,"latency":5000000,"sponsor":"Reliable Test Limited","packet_loss":{"sent":0,"dup":0,"max":0}}]}'
+    ;;
+
+degraded|degraded_then_healthy)
+    printf '%s\n' '{"timestamp":"2026-08-15T12:00:00Z","user_info":{"IP":"192.0.2.1","Isp":"Test ISP","Country":"GB"},"servers":[{"dl_speed":100000000,"ul_speed":625000,"latency":5000000,"sponsor":"Reliable Test Limited","packet_loss":{"sent":0,"dup":0,"max":0}}]}'
+    ;;
+
+packet_loss)
+    printf '%s\n' '{"timestamp":"2026-08-15T12:00:00Z","user_info":{"IP":"192.0.2.1","Isp":"Test ISP","Country":"GB"},"servers":[{"dl_speed":112500000,"ul_speed":105000000,"latency":5000000,"sponsor":"Reliable Test Limited","packet_loss":{"sent":95,"dup":0,"max":99}}]}'
+    ;;
+
+error)
+    exit 1
+    ;;
+esac

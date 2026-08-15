@@ -1,105 +1,66 @@
 # Roadmap
 
-This document outlines the planned direction for Home Network Monitor.
+Home Network Monitor prioritises reliability, small resource usage, privacy and maintainability. Features are added only when they improve the practical monitoring experience without turning the project into a large observability platform.
 
-The project's primary goals are to remain lightweight, reliable and easy to maintain while providing useful monitoring for a home network.
+## Current release
 
----
+### v1.3.0
 
-# Current Release
-
-## ✅ v1.2.0
-
-Completed features:
-
-- Internet connectivity monitoring
-- Scheduled speed testing
-- Telegram integration
-- Daily network summary
-- Performance degradation detection
-- Recovery notifications
-- CSV logging
-- Configuration management
-- Installer / Uninstaller
-- GitHub version control
-- Documentation
-
----
-
-# Next Release
-
-## 🚀 v1.3.0
-
-Planned improvements:
-
+- Download and upload monitoring
+- Primary and fallback speed-test servers
+- Same-run confirmation of degraded results
+- Latency and packet-loss reporting
 - Network Health Score
-- Packet loss reporting
-- ISP information
-- Better CLI status output
-- Automatic log rotation
-- Version command
+- Independently verified ISP and test-server reporting
+- Improved CLI status
+- Dedicated version command
+- Automatic log rotation and retention
+- Safe CSV schema migration
+- Configurable connectivity targets
+- Daily averages and uptime
+- Automated simulated tests
+- GitHub Actions validation
 
----
+## Candidate next release
 
-# Future Ideas
+### v1.4.0
 
-Possible future enhancements:
+Potential improvements:
 
-- Weekly network reports
-- Monthly performance reports
-- Historical speed trends
-- Email notifications
-- Discord notifications
-- ntfy support
-- Slack notifications
-- Multiple speed test servers
-- Backup speed test server
-- Docker container
-- Optional web dashboard
-- REST API
+- Weekly summary command and notification
+- Monthly performance summary
+- Historical trend command using existing CSV data
+- Optional notification provider such as ntfy
+- Additional installer validation
+
+The next release scope will be selected from real usage rather than implemented all at once.
+
+## Future ideas
+
 - Prometheus metrics
-- Grafana dashboard
-
----
-
-# Design Philosophy
-
-This project will always prioritise:
-
-- Lightweight implementation
-- Minimal dependencies
-- Human-readable notifications
-- Easy installation
-- Easy maintenance
-- Open documentation
-- Privacy
-- Reliability
-
-New features will only be added if they improve the usefulness of the project without significantly increasing complexity.
-
----
-
-# Contribution Ideas
-
-Potential areas for future contributions:
-
+- Optional Grafana example dashboard
+- Docker image
+- REST API
 - Additional notification providers
-- Better reporting
-- New CLI commands
-- Improved logging
-- Additional installation methods
-- Unit testing
 - Cross-platform support
 
----
+These remain ideas, not commitments. They must preserve the lightweight design.
 
-# Long-Term Vision
+## Deliberate non-goals
 
-Home Network Monitor aims to remain a lightweight alternative to large monitoring platforms for users who simply want to know:
+- Replacing enterprise network monitoring
+- Requiring a database
+- Opening inbound ports
+- Collecting browsing history
+- Running continuous high-bandwidth tests
+- Adding a web interface without a clear operational benefit
 
-- Is my internet working?
-- Has performance changed?
-- Should I be notified?
-- What happened while I was away?
+## Design principles
 
-The project intentionally focuses on solving these problems without introducing unnecessary complexity.
+- Human-readable output
+- Minimal dependencies
+- Safe upgrades
+- No credentials in Git
+- Useful alerts rather than frequent alerts
+- Transparent calculations
+- Documentation that matches the released behaviour

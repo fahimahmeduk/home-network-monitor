@@ -1,49 +1,174 @@
 #!/usr/bin/env bash
 
-BASE="/opt/home-network-monitor"
+set -u
+set -o pipefail
+
+BASE="${HOME_NETWORK_MONITOR_BASE:-/opt/home-network-monitor}"
+VERSION="$(cat "$BASE/VERSION" 2>/dev/null || echo unknown)"
+
+print_status() {
+    local internet_state=""
+    local last_internet=""
+    local speed_header=""
+    local last_speed=""
+
+    internet_state="$(cat "$BASE/state/internet.state" 2>/dev/null || echo unknown)"
+    last_internet="$(tail -n 1 "$BASE/logs/internet.log" 2>/dev/null || true)"
+    speed_header="$(head -n 1 "$BASE/logs/speed.csv" 2>/dev/null || true)"
+    last_speed="$(tail -n 1 "$BASE/logs/speed.csv" 2>/dev/null || true)"
+
+    echo "Home Network Monitor v${VERSION}"
+    echo "-----------------------------"
+    echo "Internet state : ${internet_state^^}"
+    echo "Last check     : ${last_internet:-No result available}"
+    echo
+
+    if [[ -z "$last_speed" || "$last_speed" == "$speed_header" ]]; then
+        echo "Speed test     : No result available"
+        return
+    fi
+
+    if [[ "$speed_header" != timestamp,download_mbps,upload_mbps,latency_ms,packet_loss_percent,packet_loss_source,health_score,isp,server,status,attempts,reason ]]; then
+        echo "Last speed test: $last_speed"
+        echo "Format         : Legacy v1.2 log"
+        return
+    fi
+
+    local timestamp=""
+    local download=""
+    local upload=""
+    local latency=""
+    local packet_loss=""
+    local packet_loss_source=""
+    local health_score=""
+    local isp=""
+    local server=""
+    local status=""
+    local attempts=""
+    local reason=""
+
+    IFS=',' read -r \
+        timestamp download upload latency packet_loss packet_loss_source \
+        health_score isp server status attempts reason \
+        <<< "$last_speed"
+
+    timestamp="${timestamp#\"}"
+    timestamp="${timestamp%\"}"
+    packet_loss_source="${packet_loss_source#\"}"
+    packet_loss_source="${packet_loss_source%\"}"
+    isp="${isp#\"}"
+    isp="${isp%\"}"
+    server="${server#\"}"
+    server="${server%\"}"
+    reason="${reason#\"}"
+    reason="${reason%\"}"
+
+    format_status_metric() {
+        local value="$1"
+        local suffix="$2"
+
+        if [[ -z "$value" ]] || \
+           awk -v value="$value" 'BEGIN { exit !(value < 0) }'; then
+            printf '%s' "N/A"
+        else
+            printf '%s%s' "$value" "$suffix"
+        fi
+    }
+
+    echo "Speed state    : ${status^^}"
+    echo "Tested         : $timestamp"
+    echo "Download       : $(format_status_metric "$download" " Mbps")"
+    echo "Upload         : $(format_status_metric "$upload" " Mbps")"
+    echo "Latency        : $(format_status_metric "$latency" " ms")"
+    echo "Packet loss    : $(format_status_metric "$packet_loss" "%")"
+    echo "Loss source    : $packet_loss_source"
+    echo "Health score   : $(format_status_metric "$health_score" "/100")"
+    echo "ISP            : $isp"
+
+    echo "Server         : ${server% Limited}"
+    echo "Attempts       : $attempts"
+    echo "Assessment     : $reason"
+}
+
+test_telegram() {
+    local config_file="$BASE/config.conf"
+
+    if [[ ! -r "$config_file" ]]; then
+        echo "Configuration file is missing or unreadable: $config_file" >&2
+        return 1
+    fi
+
+    # shellcheck disable=SC1090
+    source "$config_file"
+
+    if curl -fsS --max-time 15 \
+        -X POST \
+        "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+        -d "chat_id=${CHAT_ID}" \
+        --data-urlencode \
+        "text=✅ Home Network Monitor v${VERSION} test successful" \
+        >/dev/null; then
+        echo "Telegram test message sent successfully."
+    else
+        echo "Telegram test failed." >&2
+        return 1
+    fi
+}
 
 case "${1:-help}" in
-
 status)
-echo "Home Network Monitor"
-echo "--------------------"
-echo "Internet state: $(cat "$BASE/state/internet.state" 2>/dev/null || echo Unknown)"
-echo "Last internet check:"
-tail -1 "$BASE/logs/internet.log" 2>/dev/null
-echo
-echo "Last speed test:"
-tail -1 "$BASE/logs/speed.csv" 2>/dev/null
-;;
+    print_status
+    ;;
 
 check)
-"$BASE/internet-monitor.sh"
-;;
+    "$BASE/internet-monitor.sh"
+    ;;
 
 speed)
-"$BASE/speed-monitor.sh"
-;;
+    "$BASE/speed-monitor.sh"
+    ;;
+
+summary)
+    if "$BASE/daily-summary.sh"; then
+        echo "Daily summary sent successfully."
+    else
+        echo "Daily summary could not be sent." >&2
+        exit 1
+    fi
+    ;;
+
+version|-v|--version)
+    echo "Home Network Monitor v${VERSION}"
+    ;;
 
 logs)
-tail -20 "$BASE/logs/internet.log"
-echo
-tail -20 "$BASE/logs/speed.csv"
-;;
+    echo "Recent connectivity checks"
+    tail -n 20 "$BASE/logs/internet.log" 2>/dev/null || true
+    echo
+    echo "Recent speed checks"
+    tail -n 20 "$BASE/logs/speed.csv" 2>/dev/null || true
+    ;;
 
 test-telegram)
-source "$BASE/config.conf"
-curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
--d "chat_id=${CHAT_ID}" \
---data-urlencode "text=✅ Home Network Monitor test successful"
-;;
+    test_telegram
+    ;;
+
+help|-h|--help)
+    echo "Usage: network-monitor <command>"
+    echo
+    echo "Commands:"
+    echo "  status         Show current connectivity and speed status"
+    echo "  check          Run a connectivity check"
+    echo "  speed          Run a speed check"
+    echo "  summary        Send the daily summary now"
+    echo "  version        Show the installed version"
+    echo "  logs           Show recent connectivity and speed logs"
+    echo "  test-telegram  Send a Telegram test message"
+    ;;
 
 *)
-echo "Usage:"
-echo
-echo "network-monitor status"
-echo "network-monitor check"
-echo "network-monitor speed"
-echo "network-monitor logs"
-echo "network-monitor test-telegram"
-;;
-
+    echo "Unknown command: $1" >&2
+    echo "Run 'network-monitor help' for usage." >&2
+    exit 1
+    ;;
 esac

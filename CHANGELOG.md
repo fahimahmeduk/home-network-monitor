@@ -1,60 +1,62 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable changes to Home Network Monitor are documented here.
 
-The format is based on **Keep a Changelog** and follows Semantic Versioning.
+## [1.3.0] - 2026-08-15
 
----
+### Added
 
-# [1.2.0] - 2026-08-05
+- Upload-speed thresholds and reporting
+- Primary-to-fallback server confirmation
+- Ping-based packet-loss fallback
+- Network Health Score
+- ISP reporting
+- Packet-loss source reporting
+- Configurable connectivity targets
+- Automatic log rotation and retention
+- `network-monitor version`
+- Automated simulated test suite
+- GitHub Actions workflow
 
-## Added
+### Changed
 
-- Daily Telegram network summary
-- Performance degradation detection
+- Poor results are confirmed during the same execution instead of waiting for the next 12-hour schedule
+- Daily summaries calculate averages instead of repeating only the latest result
+- CLI status formats every performance metric
+- Daily summary schedule moved from 20:05 to 20:10
+- Connectivity script rewritten as maintainable structured Bash
+- Installer now migrates missing configuration settings and corrects runtime ownership
+
+### Fixed
+
+- Poor upload results being marked healthy
+- A single unsuitable speed-test server causing misleading assessments
+- Packet-loss data remaining unavailable when the Speedtest JSON object is empty
+- Existing configuration becoming unreadable after a fresh root-owned installation
+- Incorrect ISP labels caused by stale or inaccurate Speedtest.net caller metadata
+
+### Security
+
+- Telegram credentials remain outside the repository
+- Configuration is enforced as mode `0600`
+- Public output avoids bot credentials and public IP details
+
+## [1.2.0]
+
+- Smart download degradation alerts
 - Recovery notifications
-- Consecutive failure protection
-- Daily summary scheduler
-- Configuration guide
-- Installation guide
-- Architecture documentation
-- Telegram documentation
-- Troubleshooting guide
-- Project roadmap
-- Improved installer
-- Improved uninstaller
+- Daily Telegram summary
+- CSV status field and state tracking
 
-## Improved
+## [1.1.0]
 
-- Cleaner Telegram notifications
-- Better notification formatting
-- Improved project documentation
-- Improved installation experience
-- Better repository structure
+- Installer and uninstaller
+- CLI deployment
+- Idempotent cron setup
 
----
+## [1.0.0]
 
-# [1.1.0] - 2026-08-04
-
-## Added
-
-- Installer
-- Uninstaller
-- Configuration management
-- GitHub repository
-- SSH authentication
-- Documentation structure
-
----
-
-# [1.0.0] - 2026-08-04
-
-## Initial Release
-
-Initial implementation of:
-
-- Internet monitoring
+- Initial connectivity monitoring
 - Scheduled speed tests
 - Telegram integration
-- CSV logging
-- CLI commands
+- Basic status and logs

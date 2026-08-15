@@ -1,285 +1,104 @@
 # Architecture
 
-This document explains how Home Network Monitor works internally.
+Home Network Monitor is intentionally built from small Bash scripts, cron and flat files. It has no database, daemon, web server or container dependency.
 
----
+## Components
 
-# High-Level Architecture
+| Component | Purpose |
+|---|---|
+| `internet-monitor.sh` | Tests multiple connectivity targets, records state and reports restoration |
+| `speed-monitor.sh` | Measures performance, confirms poor results and calculates network health |
+| `daily-summary.sh` | Calculates daily averages and uptime, then sends the summary |
+| `network-monitor` | Provides the command-line interface |
+| `install.sh` | Deploys files, migrates configuration and manages cron entries |
+| `uninstall.sh` | Removes the installed application and scheduled entries |
+
+## Runtime flow
+
+```mermaid
+flowchart TD
+    Cron["User cron"] --> Internet["internet-monitor.sh"]
+    Cron --> Speed["speed-monitor.sh"]
+    Cron --> Daily["daily-summary.sh"]
+    Internet --> Targets["Configured ping targets"]
+    Internet --> Files["Logs and state"]
+    Speed --> Primary["Primary speed server"]
+    Primary --> Decision{"Healthy?"}
+    Decision -->|Yes| Files
+    Decision -->|No| Fallback["Fallback server"]
+    Fallback --> Files
+    Speed --> Loss["Packet-loss probe"]
+    Speed --> ISP["ISP lookup"]
+    Files --> CLI["network-monitor CLI"]
+    Files --> Telegram["Telegram API"]
+    Daily --> Telegram
+```
+
+## Filesystem layout
 
 ```text
-                    Internet
-                        │
-                        ▼
-         internet-monitor.sh (Every 5 mins)
-                        │
-                        ▼
-             Internet Status Log
-                        │
-                        ▼
-         speed-monitor.sh (08:00 & 20:00)
-                        │
-        ┌───────────────┴───────────────┐
-        │                               │
-        ▼                               ▼
-   speed.csv                    state/
-        │                               │
-        └───────────────┬───────────────┘
-                        ▼
-          daily-summary.sh (20:05)
-                        │
-                        ▼
-                 Telegram Bot API
-                        │
-                        ▼
-                 Telegram Notification
+/opt/home-network-monitor/
+├── VERSION
+├── config.conf
+├── internet-monitor.sh
+├── speed-monitor.sh
+├── daily-summary.sh
+├── logs/
+│   ├── internet.log
+│   ├── speed.csv
+│   └── rotated archives
+└── state/
+    ├── internet.state
+    ├── internet.target
+    ├── outage-start
+    ├── speed.state
+    └── speed.lock
+
+/usr/local/bin/network-monitor
 ```
 
----
+## State model
 
-# Components
+### Connectivity
 
-## internet-monitor.sh
+- `up`: at least one configured target responded.
+- `down`: no configured target responded.
+- `unknown`: no previous state exists.
 
-Runs every **5 minutes**.
+When connectivity changes from `down` to `up`, the stored outage start time is used to calculate approximate downtime.
 
-Responsibilities:
+### Performance
 
-- Checks internet connectivity.
-- Records whether the connection is UP or DOWN.
-- Logs every result.
-- Detects connection loss.
-- Detects connection recovery.
-- Sends outage notifications.
+- `healthy`: all available metrics are within thresholds.
+- `degraded`: at least one metric remains outside its threshold after confirmation.
+- `error`: the speed test failed or returned an invalid result after all attempts.
 
----
+State changes control notification suppression and recovery messages.
 
-## speed-monitor.sh
+## Confirmation logic
 
-Runs twice per day.
+The first scheduled test uses the primary speed-test server. If the result is degraded or fails:
 
-Schedule:
+1. The monitor stores the initial assessment.
+2. It waits for the configured retry interval.
+3. It runs a second test using the fallback server when configured.
+4. Only a confirmed degraded/error result changes the state and triggers an alert.
 
-```text
-08:00
-20:00
-```
+The final CSV record retains the first assessment so the retry is auditable.
 
-Responsibilities:
+## Health Score
 
-- Executes speedtest-go.
-- Measures:
-  - Download speed
-  - Latency
-- Determines whether the connection is healthy.
-- Detects degraded performance.
-- Prevents false alerts using consecutive failure detection.
-- Records results in CSV format.
+The score is a weighted calculation from download, upload, latency and packet loss. It does not replace threshold checks; it provides a readable overall indicator for summaries and trend analysis.
 
----
+## Logs
 
-## daily-summary.sh
+Logs are plain text and CSV so they can be inspected with standard Linux tools. Size-based rotation occurs before new entries are written. Archived logs older than the configured retention period are removed automatically.
 
-Runs once per day.
+## Security boundaries
 
-Schedule:
-
-```text
-20:05
-```
-
-Responsibilities:
-
-- Reads the latest speed test.
-- Calculates today's uptime.
-- Creates a human-friendly summary.
-- Sends a Telegram notification.
-
----
-
-## network-monitor
-
-Provides a simple command-line interface.
-
-Available commands:
-
-```bash
-network-monitor status
-
-network-monitor check
-
-network-monitor speed
-
-network-monitor test-telegram
-```
-
----
-
-# Configuration
-
-All configuration is stored in:
-
-```text
-/opt/home-network-monitor/config.conf
-```
-
-The project never stores secrets inside the repository.
-
-Instead, Git tracks:
-
-```text
-config/config.example.conf
-```
-
----
-
-# Logs
-
-Internet connectivity:
-
-```text
-/opt/home-network-monitor/logs/internet.log
-```
-
-Speed tests:
-
-```text
-/opt/home-network-monitor/logs/speed.csv
-```
-
-These logs provide historical data while remaining lightweight.
-
----
-
-# State Files
-
-State information is stored in:
-
-```text
-/opt/home-network-monitor/state/
-```
-
-Examples:
-
-```text
-speed.state
-speed.failcount
-```
-
-These files allow the monitor to remember previous conditions and avoid sending repeated alerts.
-
----
-
-# Notification Flow
-
-Healthy connection
-
-```text
-Internet
-
-↓
-
-Speed Test
-
-↓
-
-Healthy
-
-↓
-
-CSV Log
-
-↓
-
-Daily Summary
-```
-
----
-
-Degraded connection
-
-```text
-Internet
-
-↓
-
-Speed Test
-
-↓
-
-Below Threshold
-
-↓
-
-Failure Counter
-
-↓
-
-Threshold Reached
-
-↓
-
-Telegram Alert
-```
-
----
-
-Recovery
-
-```text
-Previously Degraded
-
-↓
-
-Healthy Result
-
-↓
-
-State Updated
-
-↓
-
-Telegram Recovery Notification
-```
-
----
-
-# Scheduling
-
-Cron jobs installed by the project:
-
-```text
-*/5 * * * * internet-monitor.sh
-
-0 8,20 * * * speed-monitor.sh
-
-5 20 * * * daily-summary.sh
-```
-
----
-
-# Design Goals
-
-The project was designed around a few principles:
-
-- Lightweight
-- Minimal dependencies
-- Easy to understand
-- Easy to deploy
-- Easy to maintain
-- Human-friendly notifications
-- Suitable for long-term homelab use
-
----
-
-# Future Improvements
-
-Possible future enhancements include:
-
-- Historical trend reporting
-- Packet loss monitoring
-- Health score
-- Multiple notification providers
-- Dashboard integration
-- Optional web interface
-
-The focus will remain on keeping the project lightweight and easy to maintain.
+- Secrets exist only in the installed `config.conf`.
+- The repository contains placeholders, not credentials.
+- All integrations are outbound.
+- ISP lookup failure falls back to Speedtest metadata and never prevents a speed result from being logged.
+- The monitoring user owns runtime logs, state and configuration.
+- Installed scripts are root-owned and executable but do not run as root through cron.
